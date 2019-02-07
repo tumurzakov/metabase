@@ -9,7 +9,12 @@
              [db :as mdb]
              [public-settings :as public-settings]
              [util :as u]]
-            [metabase.api.common :refer [*current-user* *current-user-id* *current-user-permissions-set* *is-superuser?*]]
+            [metabase.api.common
+             :refer
+             [*current-user*
+              *current-user-id*
+              *current-user-permissions-set*
+              *is-superuser?*]]
             [metabase.core.initialization-status :as init-status]
             [metabase.models
              [session :refer [Session]]
@@ -17,7 +22,8 @@
              [user :as user :refer [User]]]
             [metabase.util
              [date :as du]
-             [i18n :as ui18n :refer [tru]]]
+             [i18n :as ui18n :refer [tru]]
+             [jdbc :as u.jdbc]]
             [toucan.db :as db])
   (:import com.fasterxml.jackson.core.JsonGenerator
            java.sql.SQLException))
@@ -308,7 +314,7 @@
 (add-encoder Object encode-str)
 
 (defn- encode-jdbc-clob [clob, ^JsonGenerator json-generator]
-  (.writeString json-generator (u/jdbc-clob->str clob)))
+  (.writeString json-generator (u.jdbc/clob->str clob)))
 
 ;; stringify JDBC clobs
 (add-encoder org.h2.jdbc.JdbcClob               encode-jdbc-clob) ; H2

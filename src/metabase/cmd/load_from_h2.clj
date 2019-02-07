@@ -54,7 +54,8 @@
              [table :refer [Table]]
              [task-history :refer [TaskHistory]]
              [user :refer [User]]
-             [view-log :refer [ViewLog]]]))
+             [view-log :refer [ViewLog]]]
+            [metabase.util.jdbc :as u.jdbc]))
 
 (defn- println-ok [] (println (color/green "[OK]")))
 
@@ -139,7 +140,7 @@
   (jdbc/with-db-connection [h2-conn (h2-details h2-connection-string-or-nil)]
     (doseq [e     entities
             :let  [rows (for [row (jdbc/query h2-conn [(str "SELECT * FROM " (name (:table e)))])]
-                          (m/map-vals u/jdbc-clob->str row))]
+                          (m/map-vals u.jdbc/clob->str row))]
             :when (seq rows)]
       (insert-entity! target-db-conn e rows))))
 

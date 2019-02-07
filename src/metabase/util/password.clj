@@ -3,8 +3,11 @@
   (:require [cemerick.friend.credentials :as creds]
             [metabase
              [config :as config]
-             [util :as u]]))
-
+             [util :as u]]
+            [metabase.util
+             [i18n :refer [tru]]
+             [schema :as su]]
+            [schema.core :as s]))
 
 (defn- count-occurrences
   "Return a map of the counts of each class of character for `password`.
@@ -68,3 +71,8 @@
   ;; we wrap the friend/bcrypt-verify with this function specifically to avoid unintended exceptions getting out
   (boolean (u/ignore-exceptions
              (creds/bcrypt-verify (str salt password) hashed-password))))
+
+(def ComplexPassword
+  "Schema for a valid password of sufficient complexity."
+  (su/with-api-error-message (s/constrained s/Str is-complex?)
+    (tru "Insufficient password strength")))

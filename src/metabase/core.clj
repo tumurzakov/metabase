@@ -41,6 +41,8 @@
            org.eclipse.jetty.server.Server
            org.eclipse.jetty.util.thread.QueuedThreadPool))
 
+(intern 'clojure.pprint '*print-right-margin* 200)
+
 ;;; CONFIG
 
 ;; TODO - why not just put this in `metabase.middleware` with *all* of our other custom middleware. Also, what's the

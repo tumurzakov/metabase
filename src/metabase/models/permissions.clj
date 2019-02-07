@@ -64,7 +64,7 @@
   ^Boolean [^String object-path]
   (boolean (when (and (string? object-path)
                       (seq object-path))
-             (some (u/rpartial re-matches object-path)
+             (some #(re-matches % object-path)
                    valid-object-path-patterns))))
 
 (def ObjectPath
@@ -173,13 +173,13 @@
   "Does PERMISSIONS-SET grant *full* access to object with PATH?"
   {:style/indent 1}
   ^Boolean [permissions-set path]
-  (boolean (some (u/rpartial is-permissions-for-object? path) permissions-set)))
+  (boolean (some #(is-permissions-for-object? % path) permissions-set)))
 
 (defn set-has-partial-permissions?
   "Does PERMISSIONS-SET grant access full access to object with PATH *or* to a descendant of it?"
   {:style/indent 1}
   ^Boolean [permissions-set path]
-  (boolean (some (u/rpartial is-partial-permissions-for-object? path) permissions-set)))
+  (boolean (some #(is-partial-permissions-for-object? % path) permissions-set)))
 
 
 (s/defn set-has-full-permissions-for-set? :- s/Bool

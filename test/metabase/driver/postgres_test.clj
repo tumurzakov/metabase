@@ -91,7 +91,7 @@
          (data/run-mbql-query users))
        :data
        :cols
-       (mapv (u/rpartial select-keys [:name :base_type]))))
+       (mapv #(select-keys % [:name :base_type]))))
 
 
 ;; Check that we can filter by a UUID Field

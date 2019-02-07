@@ -16,6 +16,7 @@
              [user :as user :refer [User]]]
             [metabase.util
              [i18n :refer [tru]]
+             [password :as password]
              [schema :as su]]
             [schema.core :as s]
             [toucan.db :as db]))
@@ -38,7 +39,7 @@
    first_name     su/NonBlankString
    last_name      su/NonBlankString
    email          su/Email
-   password       su/ComplexPassword
+   password       password/ComplexPassword
    allow_tracking (s/maybe (s/cond-pre s/Bool su/BooleanString))
    schedules      (s/maybe database-api/ExpandedSchedulesMap)}
   ;; Now create the user

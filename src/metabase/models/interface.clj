@@ -8,7 +8,8 @@
              [cron :as cron-util]
              [date :as du]
              [encryption :as encryption]
-             [i18n :refer [tru]]]
+             [i18n :refer [tru]]
+             [jdbc :as u.jdbc]]
             [schema.core :as s]
             [taoensso.nippy :as nippy]
             [toucan
@@ -35,7 +36,7 @@
     (json/generate-string obj)))
 
 (defn- json-out [obj keywordize-keys?]
-  (let [s (u/jdbc-clob->str obj)]
+  (let [s (u.jdbc/clob->str obj)]
     (if (string? s)
       (json/parse-string s keywordize-keys?)
       obj)))
@@ -109,7 +110,7 @@
 
 (models/add-type! :clob
   :in  identity
-  :out u/jdbc-clob->str)
+  :out u.jdbc/clob->str)
 
 (def ^:private encrypted-json-in  (comp encryption/maybe-encrypt json-in))
 (def ^:private encrypted-json-out (comp json-out-with-keywordization encryption/maybe-decrypt))
@@ -120,11 +121,11 @@
 
 (models/add-type! :encrypted-json
   :in  encrypted-json-in
-  :out (comp cached-encrypted-json-out u/jdbc-clob->str))
+  :out (comp cached-encrypted-json-out u.jdbc/clob->str))
 
 (models/add-type! :encrypted-text
   :in  encryption/maybe-encrypt
-  :out (comp encryption/maybe-decrypt u/jdbc-clob->str))
+  :out (comp encryption/maybe-decrypt u.jdbc/clob->str))
 
 (defn decompress
   "Decompress COMPRESSED-BYTES."
@@ -153,7 +154,7 @@
 ;; handles those cases.
 (models/add-type! :keyword
   :in  toucan-util/keyword->qualified-name
-  :out (comp keyword u/jdbc-clob->str))
+  :out (comp keyword u.jdbc/clob->str))
 
 
 ;;; properties

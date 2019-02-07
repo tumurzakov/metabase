@@ -25,7 +25,7 @@
 (defn- metric-details
   [{:keys [creator] :as metric}]
   (-> (dissoc metric :id :table_id :created_at :updated_at)
-      (update :creator (u/rpartial dissoc :date_joined :last_login))))
+      (update :creator #(dissoc % :date_joined :last_login))))
 
 (defn- create-metric-then-select!
   [table name description creator definition]
@@ -74,7 +74,7 @@
                                                :definition  {:filter [:= [:field-id 1] 2]}}]]
     (let [{:keys [creator] :as metric} (retrieve-metric metric-id)]
       (update (dissoc metric :id :table_id :created_at :updated_at)
-              :creator (u/rpartial dissoc :date_joined :last_login)))))
+              :creator #(dissoc % :date_joined :last_login)))))
 
 
 ;; retrieve-metrics
@@ -92,7 +92,7 @@
     (doall (for [metric (u/prog1 (retrieve-metrics table-id-1)
                                  (assert (= 1 (count <>))))]
              (update (dissoc (into {} metric) :id :table_id :created_at :updated_at)
-                     :creator (u/rpartial dissoc :date_joined :last_login))))))
+                     :creator #(dissoc % :date_joined :last_login))))))
 
 
 ;; update-metric!

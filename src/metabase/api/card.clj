@@ -58,33 +58,28 @@
 
 ;;; ----------------------------------------------- Filtered Fetch Fns -----------------------------------------------
 
-(defn- cards:all
-  "Return all `Cards`."
-  []
+(defmulti ^:private fetch-cards
+  {:arglists '([option model-id-or-nil])}
+  (fn [option _]
+    option))
+
+(defmethod fetch-cards :all [_ _]
   (db/select Card, :archived false, {:order-by [[:%lower.name :asc]]}))
 
-(defn- cards:mine
-  "Return all `Cards` created by current user."
-  []
+(defmethod fetch-cards :mine [_ _]
   (db/select Card, :creator_id api/*current-user-id*, :archived false, {:order-by [[:%lower.name :asc]]}))
 
-(defn- cards:fav
-  "Return all `Cards` favorited by the current user."
-  []
+(defmethod fetch-cards :fav [_ _]
   (->> (hydrate (db/select [CardFavorite :card_id], :owner_id api/*current-user-id*)
                 :card)
        (map :card)
        (filter (complement :archived))
        (sort-by :name)))
 
-(defn- cards:database
-  "Return all `Cards` belonging to `Database` with DATABASE-ID."
-  [database-id]
+(defmethod fetch-cards :database [_ database-id]
   (db/select Card, :database_id database-id, :archived false, {:order-by [[:%lower.name :asc]]}))
 
-(defn- cards:table
-  "Return all `Cards` belonging to `Table` with TABLE-ID."
-  [table-id]
+(defmethod fetch-cards :table [_ table-id]
   (db/select Card, :table_id table-id, :archived false, {:order-by [[:%lower.name :asc]]}))
 
 (s/defn ^:private cards-with-ids :- (s/maybe [CardInstance])
@@ -95,9 +90,7 @@
     (let [card-id->card (u/key-by :id (db/select Card, :id [:in (set card-ids)], :archived false))]
       (filter identity (map card-id->card card-ids)))))
 
-(defn- cards:recent
-  "Return the 10 `Cards` most recently viewed by the current user, sorted by how recently they were viewed."
-  []
+(defmethod fetch-cards :recent [_ _]
   (cards-with-ids (map :model_id (db/select [ViewLog :model_id [:%max.timestamp :max]]
                                    :model   "card"
                                    :user_id api/*current-user-id*
@@ -105,37 +98,17 @@
                                     :order-by [[:max :desc]]
                                     :limit    10}))))
 
-(defn- cards:popular
-  "All `Cards`, sorted by popularity (the total number of times they are viewed in `ViewLogs`).
-  (yes, this isn't actually filtering anything, but for the sake of simplicitiy it is included amongst the filter
-  options for the time being)."
-  []
+(defmethod fetch-cards :popular [_ _]
   (cards-with-ids (map :model_id (db/select [ViewLog :model_id [:%count.* :count]]
                                    :model "card"
                                    {:group-by [:model_id]
                                     :order-by [[:count :desc]]}))))
 
-(defn- cards:archived
-  "`Cards` that have been archived."
-  []
+(defmethod fetch-cards :archived [_ _]
   (db/select Card, :archived true, {:order-by [[:%lower.name :asc]]}))
 
-(def ^:private filter-option->fn
-  "Functions that should be used to return cards for a given filter option. These functions are all be called with
-  `model-id` as the sole paramenter; functions that don't use the param discard it via `u/drop-first-arg`.
-
-     ((filter->option->fn :recent) model-id) -> (cards:recent)"
-  {:all      (u/drop-first-arg cards:all)
-   :mine     (u/drop-first-arg cards:mine)
-   :fav      (u/drop-first-arg cards:fav)
-   :database cards:database
-   :table    cards:table
-   :recent   (u/drop-first-arg cards:recent)
-   :popular  (u/drop-first-arg cards:popular)
-   :archived (u/drop-first-arg cards:archived)})
-
 (defn- cards-for-filter-option [filter-option model-id]
-  (-> ((filter-option->fn (or filter-option :all)) model-id)
+  (-> (fetch-cards (or filter-option :all) model-id)
       (hydrate :creator :collection :favorite)))
 
 
@@ -143,7 +116,7 @@
 
 (def ^:private CardFilterOption
   "Schema for a valid card filter option."
-  (apply s/enum (map name (keys filter-option->fn))))
+  (apply s/enum (map name (keys (methods fetch-cards)))))
 
 (api/defendpoint GET "/"
   "Get all the Cards. Option filter param `f` can be used to change the set of Cards that are returned; default is

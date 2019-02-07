@@ -17,7 +17,9 @@
              [datasets :refer [expect-with-driver]]
              [interface :refer [def-database-definition]]]
             [metabase.test.util.timezone :as tu.tz]
-            [metabase.util.date :as du]
+            [metabase.util
+             [date :as du]
+             [timezone :as u.timezone]]
             [toucan.db :as db]
             [toucan.util.test :as tt]))
 
@@ -130,7 +132,7 @@
   (tu.tz/with-jvm-tz (t/time-zone-for-id "Asia/Hong_Kong")
     (tu/with-temporary-setting-values [report-timezone "Asia/Hong_Kong"]
       (qpt/first-row
-        (du/with-effective-timezone (Database (data/id))
+        (u.timezone/with-effective-timezone (Database (data/id))
           (qp/process-query
            {:database   (data/id)
             :type       :native
@@ -153,7 +155,7 @@
   (tu.tz/with-jvm-tz (t/time-zone-for-id "Asia/Hong_Kong")
     (tu/with-temporary-setting-values [report-timezone "America/Los_Angeles"]
       (qpt/first-row
-        (du/with-effective-timezone (Database (data/id))
+        (u.timezone/with-effective-timezone (Database (data/id))
           (qp/process-query
             {:database (data/id),
              :type :native,

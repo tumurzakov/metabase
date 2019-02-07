@@ -26,7 +26,7 @@
 
 ;;; ----------------------------------------------- Connection Details -----------------------------------------------
 
-(def ^:private ^String normalize-name (comp (u/rpartial str/replace #"-" "_") name))
+(def ^:private ^String normalize-name (comp #(str/replace % #"-" "_") name))
 
 (def ^:private ^:const details
   (datasets/when-testing-driver :bigquery

@@ -28,6 +28,7 @@
              [field-values :as sync-field-values]
              [sync-metadata :as sync-metadata]]
             [metabase.util
+             [connectivity :as u.connectivity]
              [cron :as cron-util]
              [i18n :refer [tru]]
              [schema :as su]]
@@ -316,11 +317,11 @@
           (driver.u/can-connect-with-details? engine details :throw-exceptions)
           nil
 
-          (and host port (u/host-port-up? host port))
+          (and host port (u.connectivity/host-port-up? host port))
           (invalid-response-handler :dbname (format "Connection to '%s:%d' successful, but could not connect to DB."
                                                     host port))
 
-          (and host (u/host-up? host))
+          (and host (u.connectivity/host-up? host))
           (invalid-response-handler :port (format "Connection to '%s' successful, but port %d is invalid." port))
 
           host

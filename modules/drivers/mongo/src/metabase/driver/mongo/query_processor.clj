@@ -239,7 +239,7 @@
                      (stringify format-string value))
                     ([format-string v]
                      {:___date (du/format-date format-string v)}))
-        extract   (u/rpartial du/date-extract value)]
+        extract   #(du/date-extract % value)]
     (case (or unit :default)
       :default         value
       :minute          (stringify "yyyy-MM-dd'T'HH:mm:00")

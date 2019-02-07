@@ -12,7 +12,8 @@
             [metabase.util :as u]
             [metabase.util
              [date :as du]
-             [i18n :refer [trs]]]
+             [i18n :refer [trs]]
+             [jdbc :as u.jdbc]]
             [redux.core :as redux])
   (:import com.bigml.histogram.Histogram
            com.clearspring.analytics.stream.cardinality.HyperLogLogPlus
@@ -197,7 +198,7 @@
     ((some-fn map? sequential?) (json/parse-string x))))
 
 (deffingerprinter :type/Text
-  ((map (comp str u/jdbc-clob->str)) ; we cast to str to support `field-literal` type overwriting:
+  ((map (comp str u.jdbc/clob->str)) ; we cast to str to support `field-literal` type overwriting:
                                      ; `[:field-literal "A_NUMBER" :type/Text]` (which still
                                      ; returns numbers in the result set)
    (redux/fuse {:percent-json   (stats/share valid-serialized-json?)

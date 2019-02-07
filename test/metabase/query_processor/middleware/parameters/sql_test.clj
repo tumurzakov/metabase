@@ -14,8 +14,8 @@
              [util :as tu]]
             [metabase.test.data.datasets :as datasets]
             [metabase.util
-             [date :as du]
-             [schema :as su]]
+             [schema :as su]
+             [timezone :as u.timezone]]
             [schema.core :as s]))
 
 ;;; ----------------------------------------------- basic parser tests -----------------------------------------------
@@ -565,7 +565,7 @@
   (delay (disj (qpt/non-timeseries-drivers-with-feature :native-parameters) :redshift)))
 
 (defn- process-native {:style/indent 0} [& kvs]
-  (du/with-effective-timezone (Database (data/id))
+  (u.timezone/with-effective-timezone (Database (data/id))
     (qp/process-query
       (apply assoc {:database (data/id), :type :native, :settings {:report-timezone "UTC"}} kvs))))
 

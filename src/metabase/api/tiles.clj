@@ -134,7 +134,7 @@
         lat-col-idx   (Integer/parseInt lat-col-idx)
         lon-col-idx   (Integer/parseInt lon-col-idx)
         query         (json/parse-string query keyword)
-        updated-query (update query :query (u/rpartial query-with-inside-filter lat-field-id lon-field-id x y zoom))
+        updated-query (update query :query #(query-with-inside-filter % lat-field-id lon-field-id x y zoom))
         result        (qp/process-query-and-save-execution! updated-query {:executed-by api/*current-user-id*, :context :map-tiles})
         points        (for [row (-> result :data :rows)]
                         [(nth row lat-col-idx) (nth row lon-col-idx)])]

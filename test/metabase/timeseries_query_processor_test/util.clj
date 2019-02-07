@@ -4,8 +4,7 @@
             [metabase.test.data
              [dataset-definitions :as defs]
              [datasets :as datasets]
-             [interface :as tx]]
-            [metabase.util :as u]))
+             [interface :as tx]]))
 
 (def event-based-dbs
   #{:druid})
@@ -24,9 +23,10 @@
       (data/do-with-temp-db @flattened-db-def (constantly nil)))))
 
 (defn do-with-flattened-dbdef
-  "Execute F with a flattened version of the test data DB as the current DB def."
+  "Execute `f` with a flattened version of the test data DB as the current DB def."
   [f]
-  (data/do-with-temp-db @flattened-db-def (u/drop-first-arg f)))
+  (data/do-with-temp-db @flattened-db-def (fn [db & args]
+                                            (apply f args))))
 
 (defmacro with-flattened-dbdef
   "Execute BODY using the flattened test data DB definition."

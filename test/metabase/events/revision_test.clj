@@ -311,7 +311,7 @@
                                        :actor_id         (user->id :crowberto)
                                        :revision_message "updated")})
     (update (db/select-one [Revision :model :user_id :object :is_reversion :is_creation :message], :model "Segment", :model_id (:id segment))
-            :object (u/rpartial dissoc :id :table_id))))
+            :object #(dissoc % :id :table_id))))
 
 ;; :segment-delete
 (expect
@@ -336,4 +336,4 @@
     (process-revision-event! {:topic :segment-delete
                               :item  segment})
     (update (db/select-one [Revision :model :user_id :object :is_reversion :is_creation :message], :model "Segment", :model_id (:id segment))
-            :object (u/rpartial dissoc :id :table_id))))
+            :object #(dissoc % :id :table_id))))

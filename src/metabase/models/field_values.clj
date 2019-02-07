@@ -38,7 +38,8 @@
   (merge models/IModelDefaults
          {:properties  (constantly {:timestamped? true})
           :types       (constantly {:human_readable_values :json, :values :json})
-          :post-select (u/rpartial update :human_readable_values #(or % {}))}))
+          :post-select (fn [field-values]
+                         (update field-values :human_readable_values #(or % {})))}))
 
 
 ;; ## `FieldValues` Helper Functions

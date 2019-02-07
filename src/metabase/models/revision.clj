@@ -97,7 +97,7 @@
              :description (diff-str entity (:object prev-revision) (:object revision)))
       ;; add revision user details
       (hydrate :user)
-      (update :user (u/rpartial select-keys [:id :first_name :last_name :common_name]))
+      (update :user #(select-keys % [:id :first_name :last_name :common_name]))
       ;; Filter out irrelevant info
       (dissoc :model :model_id :user_id :object)))
 

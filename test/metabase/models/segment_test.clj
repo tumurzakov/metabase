@@ -96,7 +96,7 @@
     (doall (for [segment (u/prog1 (retrieve-segments table-id-1)
                                   (assert (= 1 (count <>))))]
              (-> (dissoc (into {} segment) :id :table_id :created_at :updated_at)
-                 (update :creator (u/rpartial dissoc :date_joined :last_login)))))))
+                 (update :creator #(dissoc % :date_joined :last_login)))))))
 
 
 ;; update-segment!

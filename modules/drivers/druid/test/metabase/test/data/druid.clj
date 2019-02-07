@@ -36,7 +36,7 @@
          (map (partial zipmap (map :field-name (:field-definitions tabledef))))
          (map-indexed (fn [i row]
                         (assoc row :id (inc i))))
-         (sort-by (u/rpartial get "date")))))
+         (sort-by #(get % "date")))))
 
 (defn- write-dbdef-to-json [db-def filename]
   (io/delete-file filename :silently)

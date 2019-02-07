@@ -114,7 +114,7 @@
     (push-fake-revision card-id, :name "Tips Created by Day")
     (push-fake-revision card-id, :name "Spots Created by Day")
     (->> (revisions FakedCard card-id)
-         (map (u/rpartial dissoc :timestamp :id :model_id)))))
+         (map #(dissoc % :timestamp :id :model_id)))))
 
 ;; Check that old revisions get deleted
 (expect max-revisions
@@ -155,7 +155,7 @@
   (tt/with-temp Card [{card-id :id}]
     (push-fake-revision card-id, :name "Tips Created by Day")
     (->> (revisions+details FakedCard card-id)
-         (map (u/rpartial dissoc :timestamp :id :model_id)))))
+         (map #(dissoc % :timestamp :id :model_id)))))
 
 ;; Check that revisions properly defer to describe-diff
 (expect [(map->RevisionInstance
@@ -178,7 +178,7 @@
     (push-fake-revision card-id, :name "Tips Created by Day")
     (push-fake-revision card-id, :name "Spots Created by Day")
     (->> (revisions+details FakedCard card-id)
-         (map (u/rpartial dissoc :timestamp :id :model_id)))))
+         (map #(dissoc % :timestamp :id :model_id)))))
 
 ;;; # REVERT
 
@@ -229,4 +229,4 @@
     (let [[_ {old-revision-id :id}] (revisions FakedCard card-id)]
       (revert! :entity FakedCard, :id card-id, :user-id (user->id :rasta), :revision-id old-revision-id)
       (->> (revisions FakedCard card-id)
-           (map (u/rpartial dissoc :timestamp :id :model_id))))))
+           (map #(dissoc % :timestamp :id :model_id))))))

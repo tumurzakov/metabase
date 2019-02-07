@@ -14,8 +14,8 @@
              [util :as sync-util]]
             [metabase.sync.analyze.fingerprint.fingerprinters :as f]
             [metabase.util
-             [date :as du]
-             [schema :as su]]
+             [schema :as su]
+             [timezone :as u.timezone]]
             [redux.core :as redux]
             [schema.core :as s]
             [toucan.db :as db]))
@@ -166,7 +166,7 @@
   [database :- i/DatabaseInstance
    tables :- [i/TableInstance]
    log-progress-fn]
-  (du/with-effective-timezone database
+  (u.timezone/with-effective-timezone database
     (apply merge-with + (for [table tables
                               :let [result (fingerprint-fields! table)]]
                           (do

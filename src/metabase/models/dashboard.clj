@@ -155,8 +155,8 @@
   revision/IRevisioned
   (merge revision/IRevisionedDefaults
          {:serialize-instance  (fn [_ _ dashboard] (serialize-dashboard dashboard))
-          :revert-to-revision! (u/drop-first-arg revert-dashboard!)
-          :diff-str            (u/drop-first-arg diff-dashboards-str)}))
+          :revert-to-revision! (fn [_ & args] (apply revert-dashboard! args))
+          :diff-str            (fn [_ & args] (apply diff-dashboards-str args))}))
 
 
 ;;; +----------------------------------------------------------------------------------------------------------------+

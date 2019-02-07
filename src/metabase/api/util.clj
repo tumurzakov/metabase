@@ -6,13 +6,13 @@
             [metabase.api.common :as api]
             [metabase.logger :as logger]
             [metabase.util
-             [schema :as su]
+             [password :as password]
              [stats :as stats]]))
 
 (api/defendpoint POST "/password_check"
   "Endpoint that checks if the supplied password meets the currently configured password complexity rules."
   [:as {{:keys [password]} :body}]
-  {password su/ComplexPassword} ;; if we pass the su/ComplexPassword test we're g2g
+  {password password/ComplexPassword} ;; if we pass the su/ComplexPassword test we're g2g
   {:valid true})
 
 (api/defendpoint GET "/logs"

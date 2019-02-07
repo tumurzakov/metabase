@@ -2,6 +2,7 @@
   (:require [clojure.core.memoize :as memoize]
             [expectations :refer :all]
             [honeysql.core :as hsql]
+            [metabase.util.jdbc :as u.jdbc]
             [metabase
              [db :as mdb]
              [util :as u]]
@@ -320,7 +321,7 @@
   (-> (db/query {:select [:value]
                  :from   [:setting]
                  :where  [:= :key (name setting-key)]})
-      first :value u/jdbc-clob->str))
+      first :value u.jdbc/clob->str))
 
 ;; If encryption is *enabled*, make sure Settings get saved as encrypted!
 (expect

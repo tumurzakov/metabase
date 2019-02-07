@@ -109,7 +109,7 @@
 (when-not config/is-prod?
   (doseq [[name-pattern base-types special-type] pattern+base-types+special-type]
     (assert (instance? java.util.regex.Pattern name-pattern))
-    (assert (every? (u/rpartial isa? :type/*) base-types))
+    (assert (every? #(isa? % :type/*) base-types))
     (assert (isa? special-type :type/*))))
 
 
