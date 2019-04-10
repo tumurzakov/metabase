@@ -120,36 +120,49 @@
 
 ;;; ------------------------------------------- Fetching & Inserting Rows --------------------------------------------
 
-(defn- insert-entity! [target-db-conn {:keys [table], :as entity} objs]
-  ;; TODO - I don't think the print+flush is working as intended :/
-  (print (u/format-color 'blue "Transfering %d instances of %s..." (count objs) (:name entity)))
-  (flush)
-  ;; 1) `:sizeX` and `:sizeY` come out of H2 as `:sizex` and `:sizey` because of automatic lowercasing; fix the
-  ;;    names of these before putting into the new DB
+(defn- objects->colums+values
+  "Given a sequence of objects/rows fetched from the H2 DB, return a the `columns` that should be used in the `INSERT`
+  statement, and a sequence of rows (as seqeunces)."
+  [objs]
+  ;; 1) `:sizeX` and `:sizeY` come out of H2 as `:sizex` and `:sizey` because of automatic lowercasing; fix the names
+  ;;    of these before putting into the new DB
+  ;;
   ;; 2) Need to wrap the column names in quotes because Postgres automatically lowercases unquoted identifiers
-  (let [ks   (keys (set/rename-keys (first objs) {:sizex :sizeX, :sizey :sizeY}))
-        cols (for [k ks]
-               ((db/quote-fn) (name k)))]
-    ;; The connection closes prematurely on occasion when we're inserting thousands of rows at once. Break into
-    ;; smaller chunks so connection stays alive
-    (doseq [chunk (partition-all 300 objs)
-            :let  [vals (for [row chunk]
-                          (map row ks))]]
-      (print (color/blue \.))
-      (flush)
-      (try
-        (jdbc/insert-multi! target-db-conn table cols vals)
-        (catch SQLException e
-          (jdbc/print-sql-exception-chain e)
-          (throw e)))))
-  (println-ok))
+  (let [source-keys (keys (first objs))
+        dest-keys   (for [k source-keys]
+                      ((db/quote-fn) (name (case k
+                                             :sizex :sizeX
+                                             :sizey :sizeY
+                                             k))))]
+    {:cols dest-keys
+     :vals (for [row objs]
+             (map (comp u/jdbc-clob->str row) source-keys))}))
 
+(def ^:private chunk-size 100)
+
+(defn- insert-chunk! [target-db-conn table-name chunk]
+  (print (color/blue \.))
+  (flush)
+  (try
+    (let [{:keys [cols vals]} (objects->colums+values chunk)]
+      (jdbc/insert-multi! target-db-conn table-name cols vals))
+    (catch SQLException e
+      (jdbc/print-sql-exception-chain e)
+      (throw e))))
+
+(defn- insert-entity! [target-db-conn {table-name :table, entity-name :name} objs]
+  (print (u/format-color 'blue "Transfering %d instances of %s..." (count objs) entity-name))
+  (flush)
+  ;; The connection closes prematurely on occasion when we're inserting thousands of rows at once. Break into
+  ;; smaller chunks so connection stays alive
+  (doseq [chunk (partition-all chunk-size objs)]
+    (insert-chunk! target-db-conn table-name chunk))
+  (println-ok))
 
 (defn- load-data! [target-db-conn h2-connection-string-or-nil]
   (jdbc/with-db-connection [h2-conn (h2-details h2-connection-string-or-nil)]
     (doseq [e     entities
-            :let  [rows (for [row (jdbc/query h2-conn [(str "SELECT * FROM " (name (:table e)))])]
-                          (m/map-vals u/jdbc-clob->str row))]
+            :let  [rows (jdbc/query h2-conn [(str "SELECT * FROM " (name table-name))])]
             :when (seq rows)]
       (insert-entity! target-db-conn e rows))))
 
@@ -224,6 +237,9 @@
   Defaults to using `@metabase.db/db-file` as the connection string."
   [h2-connection-string-or-nil]
   (mdb/setup-db!)
+
+  (assert (#{:postgres :mysql} (mdb/db-type))
+    (str (trs "Metabase can only transfer data from H2 to Postgres or MySQL/MariaDB.")))
 
   (jdbc/with-db-transaction [target-db-conn (mdb/jdbc-details)]
     (jdbc/db-set-rollback-only! target-db-conn)
