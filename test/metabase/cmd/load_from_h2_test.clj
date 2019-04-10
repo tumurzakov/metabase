@@ -5,6 +5,14 @@
             [metabase.util :as u]
             [toucan.models :as models]))
 
+;; Make sure `chunked-reduce` works the right way
+(expect
+  [2 2 2 1]
+  (let [counts (atom [])
+        f  #(swap! counts conj (count %))]
+    (#'load-from-h2/chunked-reduce f 2 (range 7))
+    @counts))
+
 ;; Make sure load-from-h2 works with or without `file:` prefix
 (expect
   {:classname   "org.h2.Driver"

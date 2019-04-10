@@ -61,9 +61,36 @@
             [toucan.db :as db])
   (:import java.sql.SQLException))
 
+;;; ---------------------------------------------------- Util fns ----------------------------------------------------
+
 (defn- println-ok [] (println (color/green "[OK]")))
 
 (defn- dispatch-on-db-type [& _] (mdb/db-type))
+
+(defn- chunked-reducer [f chunk-size]
+  (fn [acc x]
+    (let [acc (conj acc x)]
+      (if (= (count acc) chunk-size)
+        (do
+          (f acc)
+          [])
+        acc))))
+
+;; TODO - Is there a better way of doing this? If not, consider moving to util namespace if it proves to be generally
+;; useful
+(defn- chunked-reduce
+  "Like
+
+    (doseq [chunk (partition-all chunk-size coll)]
+      (f chunk))
+
+  but works on Reducible objects (e.g. `jdbc/reducible-query` results)."
+  [f chunk-size reducible]
+  (let [remaining (reduce (chunked-reducer f chunk-size) [] reducible)]
+    (when (seq remaining)
+      (f remaining)))
+  nil)
+
 
 ;;; ------------------------------------------ Models to Migrate (in order) ------------------------------------------
 
@@ -138,33 +165,34 @@
      :vals (for [row objs]
              (map (comp u/jdbc-clob->str row) source-keys))}))
 
-(def ^:private chunk-size 100)
-
-(defn- insert-chunk! [target-db-conn table-name chunk]
+(defn- insert-chunk!
+  "Insert a `chunk` of rows into Table with `table-name`."
+  [target-db-connection table-name chunk]
   (print (color/blue \.))
   (flush)
   (try
     (let [{:keys [cols vals]} (objects->colums+values chunk)]
-      (jdbc/insert-multi! target-db-conn table-name cols vals))
+      (jdbc/insert-multi! target-db-connection table-name cols vals))
     (catch SQLException e
       (jdbc/print-sql-exception-chain e)
       (throw e))))
 
-(defn- insert-entity! [target-db-conn {table-name :table, entity-name :name} objs]
-  (print (u/format-color 'blue "Transfering %d instances of %s..." (count objs) entity-name))
-  (flush)
-  ;; The connection closes prematurely on occasion when we're inserting thousands of rows at once. Break into
-  ;; smaller chunks so connection stays alive
-  (doseq [chunk (partition-all chunk-size objs)]
-    (insert-chunk! target-db-conn table-name chunk))
-  (println-ok))
+(defn- insert-entity!
+  "Stream all rows from the source table, then insert them into the destination table in chunks of up to 100. This way
+  the entire Table is not kept in memory and we can insert potentitally millions of rows."
+  [source-db-connection target-db-connection table-name]
+  (chunked-reduce
+   (partial insert-chunk! target-db-connection table-name)
+   300
+   (jdbc/reducible-query source-db-connection table-name [(format "SELECT * FROM %s" (name table-name))])))
 
-(defn- load-data! [target-db-conn h2-connection-string-or-nil]
-  (jdbc/with-db-connection [h2-conn (h2-details h2-connection-string-or-nil)]
-    (doseq [e     entities
-            :let  [rows (jdbc/query h2-conn [(str "SELECT * FROM " (name table-name))])]
-            :when (seq rows)]
-      (insert-entity! target-db-conn e rows))))
+(defn- load-data! [target-db-connection h2-connection-string-or-nil]
+  (jdbc/with-db-connection [source-db-connection (h2-details h2-connection-string-or-nil)]
+    (doseq [{table-name :table, entity-name :name} entities]
+      (let [[{row-count :count}] (jdbc/query source-db-connection [(format "SELECT count(*) AS count FROM %s" (name table-name))])]
+        (print (u/format-color 'blue "Transfering %d instances of %s..." row-count entity-name))
+        (flush))
+      (insert-entity! source-db-connection target-db-connection table-name))))
 
 
 ;;; ---------------------------------------- Enabling / Disabling Constraints ----------------------------------------
