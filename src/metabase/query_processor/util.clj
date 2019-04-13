@@ -28,7 +28,7 @@
   executed. See documentation for `mbql->native` and [issue #2386](https://github.com/metabase/metabase/issues/2386)
   for more information."
   ^String [{{:keys [executed-by query-hash query-type], :as info} :info}]
-  (str "Metabase" (when info
+  (str "Metabase" (when executed-by
                     (assert (instance? (Class/forName "[B") query-hash))
                     (format ":: userID: %s queryType: %s queryHash: %s"
                             executed-by query-type (codecs/bytes->hex query-hash)))))
@@ -74,7 +74,7 @@
       (empty? constraints) (dissoc :constraints)
       (empty? parameters)  (dissoc :parameters))))
 
-(defn query-hash
+(s/defn query-hash :- (Class/forName "[B")
   "Return a 256-bit SHA3 hash of QUERY as a key for the cache. (This is returned as a byte array.)"
   [query]
   (hash/sha3-256 (json/generate-string (select-keys-for-hashing query))))
