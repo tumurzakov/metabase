@@ -11,9 +11,11 @@
    https://support.office.com/en-nz/article/Excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3"
   1048576)
 
-;; TODO - maybe we should do this more generally with the help of a macro like `do-with-suppressed-output` from the
-;; test utils, perhaps implemented as separate middleware (and using a `:middleware` option). Or perhaps even make QP
-;; log level an option so you could do debug individual queries
+;; TODO - I think this should be replaced with an option like `query.middleware.disable-logging` instead.
+;;
+;; It would also be nice if we could do this more generally with the help of a macro like `do-with-suppressed-output`
+;; from the test utils, perhaps implemented as separate middleware (and using a `:middleware` option). Or perhaps even
+;; make QP log level an option so you could do debug individual queries.
 (def ^:dynamic ^Boolean *disable-qp-logging*
   "Should we disable logging for the QP? (e.g., during sync we probably want to turn it off to keep logs less
   cluttered)."

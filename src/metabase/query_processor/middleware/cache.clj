@@ -20,7 +20,9 @@
              [util :as u]]
             [metabase.query-processor.middleware.cache-backend.interface :as i]
             [metabase.query-processor.util :as qputil]
-            [metabase.util.date :as du]))
+            [metabase.util
+             [date :as du]
+             [i18n :refer [trs]]]))
 
 ;; TODO - Why not make this an option in the query itself? :confused:
 (def ^:dynamic ^Boolean *ignore-cached-results*
@@ -37,7 +39,7 @@
 (defn- valid-backend? [instance] (extends? i/IQueryProcessorCacheBackend (class instance)))
 
 (defn- get-backend-instance-in-namespace
-  "Return a valid query cache backend `instance` in BACKEND-NS-SYMB, or throw an Exception if none exists."
+  "Return a valid query cache backend `instance` in `backend-ns-symb`, or throw an Exception if none exists."
   ;; if for some reason the resolved var doesn't satisfy `IQueryProcessorCacheBackend` we'll reload the namespace
   ;; it belongs to and try one more time.
   ;; This fixes the issue in dev sessions where the interface namespace gets reloaded causing the cache implementation
@@ -47,7 +49,8 @@
   ([backend-ns-symb allow-reload?]
    (let [varr (ns-resolve backend-ns-symb 'instance)]
      (cond
-       (not varr)             (throw (Exception. (str "No var named 'instance' found in namespace " backend-ns-symb)))
+       (not varr)             (throw (Exception. (str (trs "No var named 'instance' found in namespace {0}"
+                                                           backend-ns-symb))))
        (valid-backend? @varr) @varr
        allow-reload?          (do (require backend-ns-symb :reload)
                                   (get-backend-instance-in-namespace backend-ns-symb false))
@@ -55,7 +58,7 @@
                                                          backend-ns-symb)))))))
 
 (defn- set-backend!
-  "Set the cache backend to the cache defined by the keyword BACKEND.
+  "Set the cache backend to the cache defined by the keyword `backend`.
 
    (This should be something like `:db`, `:redis`, or `:memcached`. See the
    documentation in `metabase.query-processor.middleware.cache-backend.interface` for details on how this works.)"
@@ -64,7 +67,7 @@
   ([backend]
    (let [backend-ns-symb (symbol (str "metabase.query-processor.middleware.cache-backend." (munge (name backend))))]
      (require backend-ns-symb)
-     (log/info "Using query processor cache backend:" (u/format-color 'blue backend) (u/emoji "💾"))
+     (log/info (trs "Using query processor cache backend:") (u/format-color 'blue backend) (u/emoji "💾"))
      (reset! backend-instance (get-backend-instance-in-namespace backend-ns-symb)))))
 
 
@@ -75,12 +78,12 @@
   (when-not *ignore-cached-results*
     (when-let [results (i/cached-results @backend-instance query-hash max-age-seconds)]
       (assert (du/is-temporal? (:updated_at results))
-        "cached-results should include an `:updated_at` field containing the date when the query was last ran.")
-      (log/info "Returning cached results for query" (u/emoji "💾"))
+        (str (trs "cached-results should include an `:updated_at` field containing the date when the query was last ran.")))
+      (log/info (trs "Returning cached results for query") (u/emoji "💾"))
       (assoc results :cached true))))
 
 (defn- save-results!  [query-hash results]
-  (log/info "Caching results for next time for query" (u/emoji "💾"))
+  (log/info (trs "Caching results for next time for query") (u/emoji "💾"))
   (i/save-results! @backend-instance query-hash results))
 
 
@@ -90,25 +93,25 @@
   (boolean (and (public-settings/enable-query-caching)
                 cache-ttl)))
 
-(defn- save-results-if-successful! [query-hash results]
-  (when (= (:status results) :completed)
-    (save-results! query-hash results)))
-
-(defn- run-query-and-save-results-if-successful! [query-hash qp query]
-  (let [start-time-ms (System/currentTimeMillis)
-        results       (qp query)
-        total-time-ms (- (System/currentTimeMillis) start-time-ms)
+(defn- save-results-if-successful! [query-hash start-time-ms {:keys [status], :as results}]
+  (let [total-time-ms (- (System/currentTimeMillis) start-time-ms)
         min-ttl-ms    (* (public-settings/query-caching-min-ttl) 1000)]
-    (log/info (format "Query took %d ms to run; miminum for cache eligibility is %d ms" total-time-ms min-ttl-ms))
-    (when (>= total-time-ms min-ttl-ms)
-      (save-results-if-successful! query-hash results))
-    results))
+    (log/info (trs "Query took {0} ms to run; miminum for cache eligibility is {1} ms" total-time-ms min-ttl-ms))
+    (when (and (= status :completed)
+               (>= total-time-ms min-ttl-ms))
+      (save-results! query-hash results))))
 
-(defn- run-query-with-cache [qp {:keys [cache-ttl], :as query}]
-  ;; TODO - Query will already have `info.hash` if it's a userland query. I'm not 100% sure it will be the same hash.
+(defn- run-query-with-cache [qp {:keys [cache-ttl], :as query} respond raise canceled-chan]
+  ;; TODO - Query will already have `info.hash` if it's a userland query. I'm not 100% sure it will be the same hash,
+  ;; because this is calculated after normalization, instead of before
   (let [query-hash (qputil/query-hash query)]
-    (or (cached-results query-hash cache-ttl)
-        (run-query-and-save-results-if-successful! query-hash qp query))))
+    (if-let [cached-results (cached-results query-hash cache-ttl)]
+      (respond cached-results)
+      (let [start-time (System/currentTimeMillis)
+            respond    (fn [results]
+                         (save-results-if-successful! query-hash start-time results)
+                         (respond results))]
+        (qp query respond raise canceled-chan)))))
 
 (defn maybe-return-cached-results
   "Middleware for caching results of a query if applicable.
@@ -123,13 +126,13 @@
         running the query, satisfying this requirement.)
      *  The result *rows* of the query must be less than `query-caching-max-kb` when serialized (before compression)."
   [qp]
-  (fn [query]
+  (fn [query respond raise canceled-chan]
     (if-not (is-cacheable? query)
-      (qp query)
+      (qp query respond raise canceled-chan)
       ;; wait until we're actually going to use the cache before initializing the backend. We don't want to initialize
       ;; it when the files get compiled, because that would give it the wrong version of the
       ;; `IQueryProcessorCacheBackend` protocol
       (do
         (when-not @backend-instance
           (set-backend!))
-        (run-query-with-cache qp query)))))
+        (run-query-with-cache qp query respond raise canceled-chan)))))

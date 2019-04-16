@@ -84,7 +84,7 @@
   (failure-response query-execution message result))
 
 (defn- format-userland-query-result
-  "Make sure `query-result` `:status` is something other than `nil`or `:failed`, or throw an Exception."
+  "Make sure `query-result` `:status` is something other than `nil`or `:failed`, or return a failure response."
   [query-execution {:keys [status], :as result}]
   (cond
     (not status)
@@ -133,9 +133,13 @@
   "Do extra handling 'userland' queries (i.e. ones ran as a result of a user action, e.g. an API call, scheduled Pulse,
   etc.). This includes recording QueryExecution entries and returning the results in an FE-client-friendly format."
   [qp]
-  (fn [{{:keys [userland-query?]} :middleware, :as query}]
+  (fn [{{:keys [userland-query?]} :middleware, :as query} respond raise canceled-chan]
     (if-not userland-query?
-      (qp query)
+      (qp query respond raise canceled-chan)
       ;; add calculated hash to query
       (let [query (assoc-in query [:info :query-hash] (qputil/query-hash query))]
-        (format-userland-query-result (query-execution-info query) (qp query))))))
+        (qp
+         query
+         (comp respond (partial format-userland-query-result (query-execution-info query)))
+         raise
+         canceled-chan)))))

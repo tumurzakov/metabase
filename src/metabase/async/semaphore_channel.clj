@@ -2,7 +2,8 @@
   (:require [clojure.core.async :as a]
             [clojure.tools.logging :as log]
             [metabase.async.util :as async.u]
-            [metabase.util.i18n :refer [trs]])
+            [metabase.util.i18n :refer [trs]]
+            [schema.core :as s])
   (:import java.io.Closeable
            java.util.concurrent.Semaphore))
 
@@ -73,28 +74,33 @@
 (defn- do-f-with-permit
   "Once a `permit` is obtained, execute `(apply f args)`, writing the results to `output-chan`, and returning the permit
   no matter what."
-  [^Closeable permit out-chan f & args]
+  [^Closeable permit, out-chan f & args]
   (try
-    (let [f (fn []
-              (with-open [permit permit]
-                (try
-                  (apply f args)
-                  (catch Throwable e
-                    e)
-                  (finally
-                    (log/debug (trs "f finished, permit will be returned"))))))]
+    (let [f             (fn []
+                          (try
+                            (apply f args)
+                            (catch Throwable e
+                              e)
+                            (finally
+                              (log/debug (trs "f finished, permit will be returned"))
+                              (.close permit))))
+          ;; run f on separate thread, results will come in to `in-chan`
+          in-chan       (async.u/do-on-separate-thread f)
+          ;; pipe `in-chan` -> `out-chan`
+          canceled-chan (async.u/single-value-pipe in-chan out-chan)]
+      ;; if request is canceled then return the permit right away
       (a/go
-        (let [canceled-chan (async.u/single-value-pipe (async.u/do-on-separate-thread f) out-chan)]
-          (when (a/<! canceled-chan)
-            (log/debug (trs "request canceled, permit will be returned"))
-            (.close permit)))))
+        (when (a/<! canceled-chan)
+          (log/debug (trs "request canceled, permit will be returned"))
+          (.close permit))))
     (catch Throwable e
       (log/error e (trs "Unexpected error attempting to run function after obtaining permit"))
       (a/>! out-chan e)
       (.close permit))))
 
-(defn- do-after-waiting-for-new-permit [semaphore-chan f & args]
-  (let [out-chan (a/chan 1)]
+(s/defn ^:private do-after-waiting-for-new-permit :- async.u/PromiseChan
+  [semaphore-chan f & args]
+  (let [out-chan (a/promise-chan)]
     ;; fire off a go block to wait for a permit.
     (a/go
       (let [[permit first-done] (a/alts! [semaphore-chan out-chan])]
@@ -108,7 +114,7 @@
     ;; return `out-chan` which can be used to wait for results
     out-chan))
 
-(defn do-after-receiving-permit
+(s/defn do-after-receiving-permit :- async.u/PromiseChan
   "Run `(apply f args)` asynchronously after receiving a permit from `semaphore-chan`. Returns a channel from which you
   can fetch the results. Closing this channel before results are produced will cancel the function call."
   {:style/indent 1}
@@ -118,6 +124,6 @@
   (if (get *permits* semaphore-chan)
     (do
       (log/debug (trs "Current thread already has a permit for {0}, will not wait to acquire another" semaphore-chan))
-      (async.u/do-on-separate-thread f))
+      (apply async.u/do-on-separate-thread f args))
     ;; otherwise wait for a permit
     (apply do-after-waiting-for-new-permit semaphore-chan f args)))
