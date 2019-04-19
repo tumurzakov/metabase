@@ -548,6 +548,15 @@ export default {
     code: "KZT",
     name_plural: "Kazakhstani tenges",
   },
+  KGS: {
+    symbol: "KGS",
+    name: "Kyrgyz Som",
+    symbol_native: "сом",
+    decimal_digits: 2,
+    rounding: 0,
+    code: "KGS",
+    name_plural: "Kyrgyz soms",
+  },
   LBP: {
     symbol: "LB£",
     name: "Lebanese Pound",
